@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { createCalendarEvent } from '@/lib/google-calendar/events'
 import type { CreateAppointmentInput } from '@/types/booking'
 
@@ -16,7 +16,12 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const supabase = await createClient()
+  const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  
+  console.log('body recebido:', { service_id, client_name, client_email, client_phone, start_at })
 
   // Busca o serviço para calcular o end_at
   const { data: service, error: serviceError } = await supabase
@@ -85,6 +90,7 @@ export async function POST(req: NextRequest) {
     .select('id, gcal_link')
     .single()
 
+  console.log('erro ao inserir:', insertError)
   if (insertError) {
     return NextResponse.json(
       { error: 'Erro ao salvar agendamento' },
