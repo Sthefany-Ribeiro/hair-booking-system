@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Button from '@/components/ui/Button'
-import Loading from '@/components/ui/Loading'
 import type { Service } from '@/types/database'
 import type { TimeSlot } from '@/types/booking'
 
@@ -13,157 +11,139 @@ interface Props {
   onBack: () => void
 }
 
-function formatDateDisplay(date: string): string {
-  return new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-  })
+function formatDate(d: string): string {
+  return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' })
 }
 
-function formatDuration(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (m === 0) return `${h}h`
-  return `${h}h${m}min`
+function formatDuration(min: number): string {
+  const h = Math.floor(min/60); const m = min%60
+  return m === 0 ? `${h}h` : `${h}h${m}min`
+}
+
+function formatEndTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', timeZone:'America/Sao_Paulo' })
 }
 
 export default function StepTime({ service, date, onSelect, onBack }: Props) {
-  const [slots, setSlots]       = useState<TimeSlot[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState<string | null>(null)
+  const [slots, setSlots] = useState<TimeSlot[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<TimeSlot | null>(null)
 
   useEffect(() => {
-    setLoading(true)
-    setError(null)
-    setSelected(null)
-
+    setLoading(true); setError(null); setSelected(null)
     fetch(`/api/availability?service_id=${service.id}&date=${date}`)
       .then(r => r.json())
-      .then(data => {
-        if (data.error) throw new Error(data.error)
-        setSlots(data.slots)
-      })
-      .catch(() => setError('Não foi possível verificar a disponibilidade.'))
+      .then(d => { if (d.error) throw new Error(d.error); setSlots(d.slots) })
+      .catch(() => setError('Nao foi possivel verificar a disponibilidade.'))
       .finally(() => setLoading(false))
   }, [service.id, date])
 
-  if (loading) return <Loading text="Verificando disponibilidade" />
+  const morning = slots.filter(s => new Date(s.start).getHours() < 12)
+  const afternoon = slots.filter(s => new Date(s.start).getHours() >= 12)
 
   return (
-    <div>
-      {/* Título */}
-      <div className="mb-10">
-        <p className="font-mono text-[11px] tracking-[.18em] uppercase text-[#C49040] mb-3">
-          Passo 3 · {service.name}
-        </p>
-        <h1 className="font-serif text-3xl sm:text-4xl font-bold text-white leading-tight">
-          Escolha o<br />
-          <em className="italic text-[#C49040]">horário ideal.</em>
-        </h1>
-        <p className="text-[#8A7560] text-sm mt-4">
-          {formatDateDisplay(date)} · duração ~{formatDuration(service.duration_min)}
-        </p>
+    <>
+      <style>{`
+        .time-wrapper { max-width: 600px; margin: 0 auto; }
+        .date-badge { display: inline-flex; align-items: center; gap: 10px; background: var(--beige); padding: 12px 24px; border-radius: 60px; font-size: 0.88rem; color: var(--moss); margin-bottom: 32px; }
+        .date-badge svg { stroke: var(--gold); }
+        .time-period { margin-bottom: 32px; }
+        .time-period h4 { font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-light); margin-bottom: 16px; }
+        .time-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .time-slot { padding: 14px; background: #fff; border: 2px solid var(--border); border-radius: var(--radius-sm); text-align: center; font-size: 0.88rem; font-weight: 500; color: var(--text-dark); cursor: pointer; transition: all 0.3s var(--transition); font-family: 'Outfit', sans-serif; }
+        .time-slot:hover { border-color: var(--gold); background: rgba(196,166,107,0.04); }
+        .time-slot.selected { border-color: var(--gold); background: var(--gold); color: #fff; box-shadow: 0 4px 16px rgba(196,166,107,0.3); }
+        .selected-time-info { background: var(--beige); border-radius: var(--radius-sm); padding: 16px 20px; margin-top: 16px; font-size: 0.88rem; color: var(--moss); }
+        .no-slots { text-align: center; padding: 48px; background: #fff; border-radius: var(--radius); }
+        .no-slots p { color: var(--text-light); margin-bottom: 16px; }
+        .link-back { color: var(--gold); font-size: 0.85rem; cursor: pointer; background: none; border: none; font-family: 'Outfit', sans-serif; }
+        .loading-text { text-align: center; padding: 60px; color: var(--text-light); }
+        @media (max-width: 768px) { .time-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 480px) { .time-grid { grid-template-columns: repeat(2, 1fr); } }
+      `}</style>
+
+      <div className="step-header">
+        <span className="step-label">Passo 3 de 5 · {service.name}</span>
+        <h2 className="step-title">Escolha o Horario</h2>
+        <p className="step-subtitle">Duracao do servico: ~{formatDuration(service.duration_min)}</p>
       </div>
 
-      {/* Erro */}
-      {error && (
-        <div className="py-10 text-center">
-          <p className="text-[#8A7560]">{error}</p>
-          <button
-            onClick={() => {
-              setLoading(true)
-              setError(null)
-              fetch(`/api/availability?service_id=${service.id}&date=${date}`)
-                .then(r => r.json())
-                .then(data => setSlots(data.slots))
-                .catch(() => setError('Não foi possível verificar a disponibilidade.'))
-                .finally(() => setLoading(false))
-            }}
-            className="text-[#C49040] text-sm mt-4 hover:underline"
-          >
-            Tentar novamente
-          </button>
+      <div className="time-wrapper">
+        <div className="date-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          {formatDate(date)}
         </div>
-      )}
 
-      {/* Sem horários */}
-      {!error && slots.length === 0 && (
-        <div className="border border-[#EBE0CE]/08 p-10 text-center">
-          <p className="font-serif text-xl text-[#EBE0CE] mb-2">
-            Nenhum horário disponível
-          </p>
-          <p className="text-[#8A7560] text-sm">
-            Não há vagas para {service.name} nessa data.
-            Tente outro dia.
-          </p>
-          <button
-            onClick={onBack}
-            className="text-[#C49040] text-sm mt-6 hover:underline"
-          >
-            ← Escolher outra data
-          </button>
-        </div>
-      )}
+        {loading && <div className="loading-text">Verificando disponibilidade...</div>}
 
-      {/* Grid de horários */}
-      {!error && slots.length > 0 && (
-        <>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-6">
-            {slots.map(slot => {
-              const isSelected = selected?.start === slot.start
-
-              return (
-                <button
-                  key={slot.start}
-                  onClick={() => setSelected(slot)}
-                  className={`
-                    py-3.5 text-center font-mono text-sm
-                    border transition-all duration-150
-                    ${isSelected
-                      ? 'border-[#C49040] bg-[#C49040] text-[#0B0806] font-bold'
-                      : 'border-[#EBE0CE]/10 text-[#EBE0CE] hover:border-[#C49040]/50 hover:text-[#C49040]'
-                    }
-                  `}
-                >
-                  {slot.label}
-                </button>
-              )
-            })}
+        {error && (
+          <div className="no-slots">
+            <p>{error}</p>
+            <button className="link-back" onClick={onBack}>Escolher outra data</button>
           </div>
+        )}
 
-          {/* Horário selecionado */}
-          {selected && (
-            <div className="mb-6 px-4 py-3 border border-[#C49040]/30 bg-[#C49040]/05">
-              <p className="text-sm text-[#8A7560]">
-                Início às{' '}
-                <span className="text-[#EBE0CE] font-medium">{selected.label}</span>
-                {' '}· Término aproximado às{' '}
-                <span className="text-[#EBE0CE] font-medium">
-                  {new Date(selected.end).toLocaleTimeString('pt-BR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'America/Sao_Paulo'
-                  })}
-                </span>
-              </p>
-            </div>
-          )}
-        </>
-      )}
+        {!loading && !error && slots.length === 0 && (
+          <div className="no-slots">
+            <p>Nenhum horario disponivel para {service.name} nesta data.</p>
+            <button className="link-back" onClick={onBack}>Escolher outra data</button>
+          </div>
+        )}
 
-      {/* Navegação */}
-      <div className="flex gap-4 mt-8">
-        <Button variant="ghost" onClick={onBack}>← Voltar</Button>
-        <Button
-          onClick={() => selected && onSelect(selected)}
-          disabled={!selected}
-          fullWidth
-        >
-          Preencher dados →
-        </Button>
+        {!loading && !error && slots.length > 0 && (
+          <>
+            {morning.length > 0 && (
+              <div className="time-period">
+                <h4>Manha</h4>
+                <div className="time-grid">
+                  {morning.map(slot => (
+                    <button
+                      key={slot.start}
+                      className={`time-slot ${selected?.start === slot.start ? 'selected' : ''}`}
+                      onClick={() => setSelected(slot)}
+                    >
+                      {slot.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {afternoon.length > 0 && (
+              <div className="time-period">
+                <h4>Tarde</h4>
+                <div className="time-grid">
+                  {afternoon.map(slot => (
+                    <button
+                      key={slot.start}
+                      className={`time-slot ${selected?.start === slot.start ? 'selected' : ''}`}
+                      onClick={() => setSelected(slot)}
+                    >
+                      {slot.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {selected && (
+              <div className="selected-time-info">
+                Inicio as <strong>{selected.label}</strong> · Termino aproximado as <strong>{formatEndTime(selected.end)}</strong>
+              </div>
+            )}
+          </>
+        )}
       </div>
-    </div>
+
+      <div className="step-nav">
+        <button className="btn-back" onClick={onBack}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Voltar
+        </button>
+        <button className="btn-next" disabled={!selected} onClick={() => selected && onSelect(selected)}>
+          Continuar
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </>
   )
 }

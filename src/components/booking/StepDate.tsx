@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Button from '@/components/ui/Button'
 import type { Service } from '@/types/database'
 
 interface Props {
@@ -10,150 +9,107 @@ interface Props {
   onBack: () => void
 }
 
-const MONTHS = [
-  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-]
+const MONTHS = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+const WEEKDAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab']
+const CLOSED = [0, 1] // domingo e segunda
 
-const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+function pad(d: string): string {
+  return `${d}T12:00:00`
+}
 
-// Dias da semana que a profissional NÃO atende (0=Dom, 1=Seg)
-const CLOSED_DAYS = [0, 1]
-
-function formatDateKey(year: number, month: number, day: number): string {
-  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+function toKey(y: number, m: number, d: number): string {
+  return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
 }
 
 export default function StepDate({ service, onSelect, onBack }: Props) {
   const today = new Date()
-  const [viewYear, setViewYear]   = useState(today.getFullYear())
+  const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
-  const [selected, setSelected]   = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
 
-  // Limite máximo: 60 dias à frente
   const maxDate = new Date()
   maxDate.setDate(maxDate.getDate() + 60)
 
-  function prevMonth() {
-    if (viewMonth === 0) {
-      setViewMonth(11)
-      setViewYear(y => y - 1)
-    } else {
-      setViewMonth(m => m - 1)
-    }
-  }
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay()
+  const todayKey = toKey(today.getFullYear(), today.getMonth(), today.getDate())
+  const maxKey = toKey(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate())
+  const canGoPrev = !(viewYear === today.getFullYear() && viewMonth === today.getMonth())
 
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) }
+    else setViewMonth(m => m - 1)
+  }
   function nextMonth() {
-    if (viewMonth === 11) {
-      setViewMonth(0)
-      setViewYear(y => y + 1)
-    } else {
-      setViewMonth(m => m + 1)
-    }
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1) }
+    else setViewMonth(m => m + 1)
   }
 
   function isDisabled(day: number): boolean {
-    const date = new Date(viewYear, viewMonth, day)
-    const dateKey = formatDateKey(viewYear, viewMonth, day)
-    const todayKey = formatDateKey(today.getFullYear(), today.getMonth(), today.getDate())
-
-    // Passado
-    if (dateKey < todayKey) return true
-
-    // Além do limite
-    if (date > maxDate) return true
-
-    // Dia fechado
-    if (CLOSED_DAYS.includes(date.getDay())) return true
-
-    return false
+    const key = toKey(viewYear, viewMonth, day)
+    if (key < todayKey || key > maxKey) return true
+    const dow = new Date(viewYear, viewMonth, day).getDay()
+    return CLOSED.includes(dow)
   }
 
-  // Dias do mês atual
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
-
-  // Dia da semana do primeiro dia do mês
-  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay()
-
-  // Não pode navegar para mês anterior ao atual
-  const canGoPrev = !(viewYear === today.getFullYear() && viewMonth === today.getMonth())
-
   return (
-    <div>
-      {/* Título */}
-      <div className="mb-10">
-        <p className="font-mono text-[11px] tracking-[.18em] uppercase text-[#C49040] mb-3">
-          Passo 2 · {service.name}
-        </p>
-        <h1 className="font-serif text-3xl sm:text-4xl font-bold text-white leading-tight">
-          Qual a melhor<br />
-          <em className="italic text-[#C49040]">data para você?</em>
-        </h1>
-        <p className="text-[#8A7560] text-sm mt-4">
-          Segunda e domingo não há atendimento.
-        </p>
+    <>
+      <style>{`
+        .calendar-wrapper { background: #fff; border-radius: var(--radius-lg); padding: 36px; box-shadow: var(--shadow-md); max-width: 520px; margin: 0 auto; }
+        .calendar-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+        .calendar-nav h3 { font-size: 1.4rem; color: var(--moss); }
+        .calendar-nav button { width: 40px; height: 40px; border-radius: 50%; background: var(--beige); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; color: var(--moss); font-size: 1.1rem; }
+        .calendar-nav button:hover { background: var(--gold); color: #fff; }
+        .calendar-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
+        .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 8px; }
+        .calendar-weekdays span { text-align: center; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-light); padding: 8px 0; }
+        .calendar-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.88rem; font-weight: 400; cursor: pointer; transition: all 0.3s var(--transition); border: none; background: none; color: var(--text-dark); font-family: 'Outfit', sans-serif; }
+        .cal-day:hover:not(.disabled):not(.empty) { background: var(--beige); }
+        .cal-day.selected { background: var(--gold) !important; color: #fff; font-weight: 600; box-shadow: 0 4px 12px rgba(196,166,107,0.3); }
+        .cal-day.disabled { color: var(--border); cursor: not-allowed; }
+        .cal-day.empty { cursor: default; }
+        .cal-day.today { border: 2px solid var(--gold); font-weight: 600; }
+        .selected-badge { display: inline-flex; align-items: center; gap: 10px; background: var(--beige); padding: 12px 24px; border-radius: 60px; font-size: 0.88rem; color: var(--moss); margin: 24px auto 0; display: flex; justify-content: center; max-width: 520px; }
+        @media (max-width: 768px) { .calendar-wrapper { padding: 24px; } }
+      `}</style>
+
+      <div className="step-header">
+        <span className="step-label">Passo 2 de 5 · {service.name}</span>
+        <h2 className="step-title">Escolha a Data</h2>
+        <p className="step-subtitle">Selecione o dia de preferencia para seu atendimento</p>
       </div>
 
-      {/* Calendário */}
-      <div className="border border-[#EBE0CE]/08 p-6">
-
-        {/* Navegação do mês */}
-        <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={prevMonth}
-            disabled={!canGoPrev}
-            className="w-8 h-8 flex items-center justify-center text-[#8A7560] hover:text-[#EBE0CE] disabled:opacity-20 transition-colors"
-          >
-            ←
+      <div className="calendar-wrapper">
+        <div className="calendar-nav">
+          <button onClick={prevMonth} disabled={!canGoPrev} aria-label="Mes anterior">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
-          <p className="font-serif text-lg text-white">
-            {MONTHS[viewMonth]} {viewYear}
-          </p>
-          <button
-            onClick={nextMonth}
-            className="w-8 h-8 flex items-center justify-center text-[#8A7560] hover:text-[#EBE0CE] transition-colors"
-          >
-            →
+          <h3>{MONTHS[viewMonth]} {viewYear}</h3>
+          <button onClick={nextMonth} aria-label="Proximo mes">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
           </button>
         </div>
 
-        {/* Cabeçalho dos dias */}
-        <div className="grid grid-cols-7 mb-2">
-          {DAYS.map(day => (
-            <div key={day} className="text-center font-mono text-[10px] text-[#8A7560] tracking-widest uppercase py-1">
-              {day}
-            </div>
-          ))}
+        <div className="calendar-weekdays">
+          {WEEKDAYS.map(d => <span key={d}>{d}</span>)}
         </div>
 
-        {/* Dias */}
-        <div className="grid grid-cols-7 gap-1">
-          {/* Espaços vazios antes do primeiro dia */}
-          {Array.from({ length: firstDayOfMonth }).map((_, i) => (
-            <div key={`empty-${i}`} />
+        <div className="calendar-days">
+          {Array.from({ length: firstDay }).map((_, i) => (
+            <div key={`e${i}`} className="cal-day empty" />
           ))}
-
-          {/* Dias do mês */}
           {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
-            const dateKey = formatDateKey(viewYear, viewMonth, day)
+            const key = toKey(viewYear, viewMonth, day)
             const disabled = isDisabled(day)
-            const isSelected = selected === dateKey
-
+            const isToday = key === todayKey
+            const isSel = selected === key
             return (
               <button
                 key={day}
-                onClick={() => !disabled && setSelected(dateKey)}
+                className={`cal-day ${disabled ? 'disabled' : ''} ${isToday ? 'today' : ''} ${isSel ? 'selected' : ''}`}
+                onClick={() => !disabled && setSelected(key)}
                 disabled={disabled}
-                className={`
-                  aspect-square flex items-center justify-center
-                  text-sm font-mono transition-all duration-150
-                  ${isSelected
-                    ? 'bg-[#C49040] text-[#0B0806] font-bold'
-                    : disabled
-                      ? 'text-[#EBE0CE]/15 cursor-not-allowed'
-                      : 'text-[#EBE0CE] hover:bg-[#EBE0CE]/08'
-                  }
-                `}
               >
                 {day}
               </button>
@@ -162,31 +118,23 @@ export default function StepDate({ service, onSelect, onBack }: Props) {
         </div>
       </div>
 
-      {/* Data selecionada */}
       {selected && (
-        <div className="mt-4 px-4 py-3 border border-[#C49040]/30 bg-[#C49040]/05">
-          <p className="text-sm text-[#8A7560]">
-            Data selecionada:{' '}
-            <span className="text-[#EBE0CE]">
-              {new Date(selected + 'T12:00:00').toLocaleDateString('pt-BR', {
-                weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
-              })}
-            </span>
-          </p>
+        <div className="selected-badge">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C4A66B" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          {new Date(pad(selected)).toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' })}
         </div>
       )}
 
-      {/* Navegação */}
-      <div className="flex gap-4 mt-8">
-        <Button variant="ghost" onClick={onBack}>← Voltar</Button>
-        <Button
-          onClick={() => selected && onSelect(selected)}
-          disabled={!selected}
-          fullWidth
-        >
-          Escolher horário →
-        </Button>
+      <div className="step-nav">
+        <button className="btn-back" onClick={onBack}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Voltar
+        </button>
+        <button className="btn-next" disabled={!selected} onClick={() => selected && onSelect(selected)}>
+          Continuar
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
       </div>
-    </div>
+    </>
   )
 }

@@ -8,100 +8,131 @@ import StepClient from './StepClient'
 import StepConfirm from './StepConfirm'
 import type { BookingStep } from '@/types/booking'
 import type { Service } from '@/types/database'
+import Link from 'next/link'
 
-const STEPS = ['Serviço', 'Data', 'Horário', 'Seus dados', 'Confirmar']
+const STEPS = [
+  { num: 1, label: 'Servico' },
+  { num: 2, label: 'Data' },
+  { num: 3, label: 'Horario' },
+  { num: 4, label: 'Dados' },
+  { num: 5, label: 'Confirmar' },
+]
 
-const EMPTY_BOOKING: BookingStep = {
-  service:  null,
-  date:     null,
-  timeSlot: null,
-  client:   null,
-}
+const EMPTY: BookingStep = { service: null, date: null, timeSlot: null, client: null }
 
 export default function BookingWizard() {
-  const [step, setStep]       = useState(0)
-  const [booking, setBooking] = useState<BookingStep>(EMPTY_BOOKING)
+  const [step, setStep] = useState(0)
+  const [booking, setBooking] = useState<BookingStep>(EMPTY)
 
-  function goNext() { setStep(s => s + 1) }
-  function goBack() { setStep(s => s - 1) }
-
-  function selectService(service: Service) {
-    setBooking(b => ({ ...b, service, date: null, timeSlot: null }))
-    goNext()
-  }
-
-  function selectDate(date: string) {
-    setBooking(b => ({ ...b, date, timeSlot: null }))
-    goNext()
-  }
-
-  function selectTime(timeSlot: BookingStep['timeSlot']) {
-    setBooking(b => ({ ...b, timeSlot }))
-    goNext()
-  }
-
-  function submitClient(client: BookingStep['client']) {
-    setBooking(b => ({ ...b, client }))
-    goNext()
-  }
+  const goNext = () => setStep(s => s + 1)
+  const goBack = () => setStep(s => s - 1)
 
   return (
-    <div className="min-h-screen bg-[#0B0806] text-[#EBE0CE]">
+    <>
+      <style>{`
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+          --moss: #2F4F3E;
+          --moss-light: #3d6350;
+          --gold: #C4A66B;
+          --gold-light: #d4bc88;
+          --gold-dark: #a88d55;
+          --beige: #F8F4EE;
+          --offwhite: #FCFBF8;
+          --text-dark: #1a1a1a;
+          --text-mid: #4a4a4a;
+          --text-light: #7a7a7a;
+          --border: #e8e4dd;
+          --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
+          --shadow-md: 0 8px 30px rgba(0,0,0,0.06);
+          --shadow-lg: 0 20px 60px rgba(0,0,0,0.08);
+          --radius: 16px;
+          --radius-sm: 10px;
+          --radius-lg: 24px;
+          --transition: cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        body { font-family: 'Outfit', sans-serif; background: var(--offwhite); color: var(--text-dark); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+        h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif; font-weight: 400; }
+
+        .booking-header { background: var(--moss); padding: 20px 0; position: sticky; top: 0; z-index: 100; }
+        .header-inner { max-width: 1100px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
+        .header-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500; color: #fff; letter-spacing: 0.02em; text-decoration: none; }
+        .header-logo span { color: var(--gold); }
+        .header-back { display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,0.7); font-size: 0.85rem; text-decoration: none; transition: color 0.3s; }
+        .header-back:hover { color: #fff; }
+
+        .booking-container { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+
+        .progress-bar { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 48px; padding: 0 20px; }
+        .progress-step { display: flex; align-items: center; gap: 0; }
+        .progress-dot { width: 36px; height: 36px; border-radius: 50%; background: var(--beige); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 600; color: var(--text-light); transition: all 0.4s var(--transition); position: relative; flex-shrink: 0; }
+        .progress-dot.active { background: var(--gold); border-color: var(--gold); color: #fff; box-shadow: 0 4px 16px rgba(196,166,107,0.3); }
+        .progress-dot.completed { background: var(--moss); border-color: var(--moss); color: #fff; }
+        .progress-line { width: 48px; height: 2px; background: var(--border); transition: background 0.4s; }
+        .progress-line.completed { background: var(--moss); }
+        .progress-label { position: absolute; top: 42px; left: 50%; transform: translateX(-50%); font-size: 0.65rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-light); white-space: nowrap; opacity: 0; transition: opacity 0.3s; }
+        .progress-dot.active .progress-label, .progress-dot.completed .progress-label { opacity: 1; color: var(--moss); }
+
+        .step-header { text-align: center; margin-bottom: 40px; }
+        .step-label { font-size: 0.72rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); margin-bottom: 12px; display: block; }
+        .step-title { font-size: clamp(1.8rem, 4vw, 2.6rem); color: var(--moss); margin-bottom: 10px; letter-spacing: -0.02em; }
+        .step-subtitle { font-size: 0.95rem; color: var(--text-light); font-weight: 300; }
+
+        .step-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--border); }
+        .btn-back { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background: none; border: 2px solid var(--border); border-radius: 60px; font-size: 0.85rem; font-weight: 500; color: var(--text-mid); cursor: pointer; transition: all 0.3s; font-family: 'Outfit', sans-serif; }
+        .btn-back:hover { border-color: var(--moss); color: var(--moss); }
+        .btn-back.hidden { visibility: hidden; }
+        .btn-next { display: inline-flex; align-items: center; gap: 10px; padding: 14px 36px; background: var(--gold); border: none; border-radius: 60px; font-size: 0.85rem; font-weight: 500; letter-spacing: 0.04em; color: #fff; cursor: pointer; transition: all 0.4s var(--transition); box-shadow: 0 6px 20px rgba(196,166,107,0.25); font-family: 'Outfit', sans-serif; }
+        .btn-next:hover { background: var(--gold-light); transform: translateY(-2px); box-shadow: 0 10px 30px rgba(196,166,107,0.35); }
+        .btn-next:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        @media (max-width: 480px) {
+          .step-nav { flex-direction: column-reverse; gap: 12px; }
+          .step-nav .btn-back, .step-nav .btn-next { width: 100%; justify-content: center; }
+          .progress-line { width: 28px; }
+          .progress-label { display: none; }
+        }
+      `}</style>
 
       {/* Header */}
-      <div className="border-b border-[#EBE0CE]/08 px-6 py-5 flex items-center justify-between">
-        <a href="/" className="flex flex-col leading-none">
-          <span className="font-serif text-lg text-white tracking-wide">Afro Raíz</span>
-          <span className="font-mono text-[9px] tracking-[.22em] uppercase text-[#C49040] mt-0.5">
-            São Paulo · SP
-          </span>
-        </a>
-        <a href="/" className="text-[#8A7560] text-xs hover:text-[#EBE0CE] transition-colors">
-          ← Voltar ao site
-        </a>
-      </div>
+      <header className="booking-header">
+        <div className="header-inner">
+          <Link href="/" className="header-logo">Afro <span>Raiz</span></Link>
+          <Link href="/" className="header-back">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Voltar ao site
+          </Link>
+        </div>
+      </header>
 
-      {/* Progress */}
-      <div className="max-w-2xl mx-auto px-6 pt-10 pb-6">
-        <div className="flex items-center gap-2 mb-2">
-          {STEPS.map((label, i) => (
-            <div key={label} className="flex items-center gap-2 flex-1 last:flex-none">
-              <div className="flex flex-col items-center gap-1.5">
-                <div className={`
-                  w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono
-                  transition-all duration-300
-                  ${i < step  ? 'bg-[#C49040] text-[#0B0806]' : ''}
-                  ${i === step ? 'bg-[#C49040] text-[#0B0806] ring-4 ring-[#C49040]/20' : ''}
-                  ${i > step  ? 'border border-[#EBE0CE]/15 text-[#8A7560]' : ''}
-                `}>
-                  {i < step ? '✓' : i + 1}
-                </div>
-                <span className={`
-                  text-[10px] tracking-widest uppercase font-mono hidden sm:block
-                  ${i === step ? 'text-[#C49040]' : 'text-[#8A7560]'}
-                `}>
-                  {label}
-                </span>
+      <div className="booking-container">
+        {/* Progress Bar */}
+        <div className="progress-bar">
+          {STEPS.map((s, i) => (
+            <div key={s.num} className="progress-step">
+              <div className={`progress-dot ${i < step ? 'completed' : ''} ${i === step ? 'active' : ''}`}>
+                {i < step ? (
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none"><path d="M1 4l3 3 7-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                ) : s.num}
+                <span className="progress-label">{s.label}</span>
               </div>
               {i < STEPS.length - 1 && (
-                <div className="flex-1 h-px mb-5 transition-all duration-500"
-                  style={{ background: i < step ? '#C49040' : 'rgba(235,224,206,0.08)' }}
-                />
+                <div className={`progress-line ${i < step ? 'completed' : ''}`} />
               )}
             </div>
           ))}
         </div>
-      </div>
 
-      {/* Steps */}
-      <div className="max-w-2xl mx-auto px-6 pb-20">
+        {/* Steps */}
         {step === 0 && (
-          <StepService onSelect={selectService} />
+          <StepService
+            onSelect={(service) => { setBooking(b => ({ ...b, service, date: null, timeSlot: null })); goNext() }}
+          />
         )}
         {step === 1 && booking.service && (
           <StepDate
             service={booking.service}
-            onSelect={selectDate}
+            onSelect={(date) => { setBooking(b => ({ ...b, date, timeSlot: null })); goNext() }}
             onBack={goBack}
           />
         )}
@@ -109,13 +140,13 @@ export default function BookingWizard() {
           <StepTime
             service={booking.service}
             date={booking.date}
-            onSelect={selectTime}
+            onSelect={(slot) => { setBooking(b => ({ ...b, timeSlot: slot })); goNext() }}
             onBack={goBack}
           />
         )}
         {step === 3 && (
           <StepClient
-            onSubmit={submitClient}
+            onSubmit={(client) => { setBooking(b => ({ ...b, client })); goNext() }}
             onBack={goBack}
           />
         )}
@@ -126,7 +157,6 @@ export default function BookingWizard() {
           />
         )}
       </div>
-
-    </div>
+    </>
   )
 }
